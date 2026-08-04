@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tee /private/tmp/claude-501/-Users-shubhamkumarsingh-admin-panel-template/aac0b711-dbc6-4bab-ac1b-f3313efef512/scratchpad/dev.log)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(ls -R src/router src/pages 2>/dev/null | head -40; echo \"=== chrome ===\"; ls /Applications/ | grep -iE \"chrome|chromium|edge\")",
+      "Read(//Applications/**)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless --disable-gpu --no-sandbox --hide-scrollbars --window-size=1440,900 --virtual-time-budget=6000 --screenshot=dashboard.png \"http://localhost:3000/dashboard\")",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=1440,900 --virtual-time-budget=8000 --screenshot=dash2.png \"http://localhost:3000/dashboard\")",
+      "Bash(node -e \"console.log\\('WebSocket:', typeof WebSocket\\)\")",
+      "Bash(npm init *)",
+      "Bash(npm i *)"
+    ]
+  }
+}

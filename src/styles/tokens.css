@@ -1,0 +1,202 @@
+/**
+ * Base UI tokens.
+ *
+ * Single source of truth for colour, radius, spacing and layout metrics.
+ * Every value is a CSS custom property so a consuming project can rebrand the
+ * whole panel by overriding this file only — no component edits required.
+ *
+ * Colours use oklch for perceptually even light/dark pairs.
+ */
+
+:root {
+  /* ── Radius scale ─────────────────────────────────────────────── */
+  --radius: 0.625rem;
+
+  /* ── Surface & content ────────────────────────────────────────── */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* ── Brand & intent ──────────────────────────────────────────── */
+  --primary: oklch(0.55 0.2 264);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --success: oklch(0.62 0.17 149);
+  --success-foreground: oklch(0.985 0 0);
+
+  --warning: oklch(0.75 0.16 75);
+  --warning-foreground: oklch(0.205 0 0);
+
+  --info: oklch(0.62 0.16 240);
+  --info-foreground: oklch(0.985 0 0);
+
+  /* ── Lines & focus ───────────────────────────────────────────── */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.55 0.2 264);
+
+  /* ── Sidebar surface (own scale so the shell can invert) ─────── */
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.55 0.2 264);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.55 0.2 264);
+
+  /* ── Data-visualisation series ───────────────────────────────── */
+  --chart-1: oklch(0.55 0.2 264);
+  --chart-2: oklch(0.65 0.15 195);
+  --chart-3: oklch(0.72 0.15 85);
+  --chart-4: oklch(0.6 0.19 340);
+  --chart-5: oklch(0.65 0.17 145);
+
+  /* ── Layout metrics (consumed by the admin shell) ────────────── */
+  --layout-header-height: 3.5rem;
+  --layout-sidebar-width: 16rem;
+  --layout-sidebar-width-collapsed: 3.5rem;
+  --layout-content-max-width: 96rem;
+  --layout-content-padding: 1.5rem;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.67 0.17 264);
+  --primary-foreground: oklch(0.145 0 0);
+
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --success: oklch(0.7 0.15 149);
+  --success-foreground: oklch(0.145 0 0);
+
+  --warning: oklch(0.8 0.15 75);
+  --warning-foreground: oklch(0.145 0 0);
+
+  --info: oklch(0.7 0.14 240);
+  --info-foreground: oklch(0.145 0 0);
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.67 0.17 264);
+
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.67 0.17 264);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.67 0.17 264);
+
+  --chart-1: oklch(0.67 0.17 264);
+  --chart-2: oklch(0.72 0.13 195);
+  --chart-3: oklch(0.8 0.14 85);
+  --chart-4: oklch(0.7 0.17 340);
+  --chart-5: oklch(0.73 0.15 145);
+}
+
+/**
+ * Expose the tokens above as Tailwind utilities: `bg-background`,
+ * `text-muted-foreground`, `h-header`, `w-sidebar`, and so on.
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --spacing-header: var(--layout-header-height);
+  --spacing-sidebar: var(--layout-sidebar-width);
+  --spacing-sidebar-collapsed: var(--layout-sidebar-width-collapsed);
+  --spacing-content: var(--layout-content-padding);
+
+  --container-content: var(--layout-content-max-width);
+}
