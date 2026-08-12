@@ -16,7 +16,7 @@ export function AuthLayout() {
         <ThemeToggle />
       </header>
 
-      <main className="flex flex-1 items-center justify-center p-content">
+      <main className="flex flex-1 items-center justify-center p-gutter">
         <div className="w-full max-w-sm">
           <Suspense fallback={<LoadingScreen />}>
             <Outlet />

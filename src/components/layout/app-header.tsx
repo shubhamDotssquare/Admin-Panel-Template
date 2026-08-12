@@ -1,26 +1,46 @@
-import { Menu, Search } from 'lucide-react'
+import { Menu } from 'lucide-react'
 
 import { AppBreadcrumbs } from '@/components/layout/app-breadcrumbs'
+import { AppSearch, type SearchItem } from '@/components/layout/app-search'
+import {
+  NotificationMenu,
+  type NotificationMenuProps,
+} from '@/components/layout/notification-menu'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { UserMenu, type UserMenuUser } from '@/components/layout/user-menu'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { appConfig } from '@/config/app.config'
 import { useLayout } from '@/hooks/use-layout'
 import { cn } from '@/utils/cn'
 
-interface AppHeaderProps {
+export interface AppHeaderProps {
   user?: UserMenuUser
   onSignOut?: () => void
   /** Extra controls injected between the trail and the utility cluster. */
   actions?: React.ReactNode
+  /** Records a module wants reachable from the palette, on top of the routes. */
+  searchItems?: SearchItem[]
+  /** Everything the notification panel needs; omit to render an empty panel. */
+  notifications?: NotificationMenuProps
 }
 
 /**
  * Sticky top bar: nav trigger, breadcrumb trail, and the utility cluster
- * (search, theme, account).
+ * (search, notifications, theme, account).
+ *
+ * Search and notifications can be switched off per project from
+ * `appConfig.layout`.
  */
-export function AppHeader({ user, onSignOut, actions }: AppHeaderProps) {
+export function AppHeader({
+  user,
+  onSignOut,
+  actions,
+  searchItems,
+  notifications,
+}: AppHeaderProps) {
   const { toggleSidebar, isMobile } = useLayout()
+  const { showSearch, showNotifications } = appConfig.layout
 
   return (
     <header
@@ -49,10 +69,9 @@ export function AppHeader({ user, onSignOut, actions }: AppHeaderProps) {
       <div className="ml-auto flex items-center gap-1">
         {actions}
 
-        {/* Placeholder trigger — the command palette lands with its module. */}
-        <Button variant="ghost" size="icon" aria-label="Search" disabled>
-          <Search className="size-4" />
-        </Button>
+        {showSearch && <AppSearch extraItems={searchItems} />}
+
+        {showNotifications && <NotificationMenu {...notifications} />}
 
         <ThemeToggle />
 

@@ -132,17 +132,23 @@ typed and already unwrapping the `ApiResponse` envelope.
 
 ## Planned modules
 
-| Module          | Reserved path     | Folder                         |
-| --------------- | ----------------- | ------------------------------ |
-| Dashboard       | `/dashboard`      | `dashboard/` *(implemented)*   |
-| Analytics       | `/analytics`      | `analytics/`                   |
-| User Manager    | `/users`          | `user-manager/`                |
-| Admin Manager   | `/admin-manager`  | `admin-manager/`               |
-| CMS             | `/cms`            | `cms/`                         |
-| Email Templates | `/email-templates`| `email-templates/`             |
-| Enquiry Manager | `/enquiries`      | `enquiry-manager/`             |
-| Settings        | `/settings`       | `settings/`                    |
-| Help & Support  | `/help`           | `help-support/`                |
+| Module          | Reserved path      | Folder                       |
+| --------------- | ------------------ | ---------------------------- |
+| Dashboard       | `/dashboard`       | `dashboard/` _(implemented)_ |
+| Analytics       | `/analytics`       | `analytics/`                 |
+| User Manager    | `/users`           | `user-manager/`              |
+| Admin Manager   | `/admin-manager`   | `admin-manager/`             |
+| CMS             | `/cms`             | `cms/`                       |
+| Email Templates | `/email-templates` | `email-templates/`           |
+| Enquiry Manager | `/enquiries`       | `enquiry-manager/`           |
+| Settings        | `/settings`        | `settings/`                  |
+| Help & Support  | `/help`            | `help-support/`              |
 
-Authentication screens belong to `admin-manager/`; point `PATHS.auth.login` at
-them and set `VITE_AUTH_ENABLED=true` to activate the route guards.
+Authentication is **not** a module. The sign-in, password-recovery and two-factor
+screens live in `src/pages/auth/`, because they render in `AuthLayout` outside the
+shell while this registry only mounts routes _inside_ `AdminLayout` — and because
+the guards, `sessionService` and `AuthProvider` they depend on are all
+framework-level. Set `VITE_AUTH_ENABLED=true` to activate the guards.
+
+`admin-manager/` still owns everything _about_ accounts: administrators, roles and
+permission definitions.

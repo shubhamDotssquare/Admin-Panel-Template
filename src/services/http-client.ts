@@ -1,21 +1,36 @@
 import { appConfig } from '@/config/app.config'
+import { REFRESHABLE_CODES } from '@/constants/auth-errors'
 import {
   CONTENT_TYPE,
   HTTP_STATUS,
   NETWORK_ERROR_MESSAGE,
   TIMEOUT_ERROR_MESSAGE,
 } from '@/constants/http'
-import type { ApiErrorPayload, HttpMethod, RequestOptions } from '@/types/api.types'
+import type {
+  ApiErrorDetail,
+  ApiErrorEnvelope,
+  FieldErrors,
+  HttpMethod,
+  RequestOptions,
+} from '@/types/api.types'
 import { buildQueryString } from '@/utils/query-string'
 import { ApiError } from './api-error'
 
-/** Called before each request to obtain the bearer token, if any. */
+/** Obtains the current access token, if one is held. */
 type TokenResolver = () => string | null
 
-/** Called whenever the server rejects the current credentials. */
+/**
+ * Exchanges the stored refresh token for a new pair.
+ *
+ * Resolves true when a fresh access token is available to retry with.
+ */
+type TokenRefresher = () => Promise<boolean>
+
+/** Called when the session is unrecoverable and the app must sign out. */
 type UnauthorizedHandler = () => void
 
 let resolveToken: TokenResolver = () => null
+let refreshTokens: TokenRefresher | null = null
 let onUnauthorized: UnauthorizedHandler | null = null
 
 /**
@@ -26,10 +41,30 @@ let onUnauthorized: UnauthorizedHandler | null = null
  */
 export function configureHttpClient(options: {
   getToken?: TokenResolver
+  refresh?: TokenRefresher
   onUnauthorized?: UnauthorizedHandler
 }): void {
   if (options.getToken) resolveToken = options.getToken
+  if (options.refresh) refreshTokens = options.refresh
   if (options.onUnauthorized) onUnauthorized = options.onUnauthorized
+}
+
+/**
+ * The in-flight refresh, shared by every request that needs one.
+ *
+ * This is load-bearing, not an optimisation. Refresh tokens are single-use: two
+ * concurrent 401s that each POST `/auth/refresh` would send the same token
+ * twice, and the server reads the second as token reuse and revokes the whole
+ * session. Every caller must await the *same* refresh.
+ */
+let refreshInFlight: Promise<boolean> | null = null
+
+function refreshOnce(): Promise<boolean> {
+  refreshInFlight ??= (refreshTokens?.() ?? Promise.resolve(false)).finally(() => {
+    refreshInFlight = null
+  })
+
+  return refreshInFlight
 }
 
 function buildUrl(path: string, params?: Record<string, unknown>): string {
@@ -65,23 +100,59 @@ async function parseBody(response: Response): Promise<unknown> {
   return text === '' ? null : text
 }
 
+/** `[{ field: 'email', message: '…' }]` → `{ email: ['…'] }` for form binding. */
+function toFieldErrors(details: ApiErrorDetail[] | undefined): FieldErrors | undefined {
+  if (!details?.length) return undefined
+
+  const mapped: FieldErrors = {}
+  for (const detail of details) {
+    if (!detail.field || !detail.message) continue
+    ;(mapped[detail.field] ??= []).push(detail.message)
+  }
+
+  return Object.keys(mapped).length > 0 ? mapped : undefined
+}
+
 function toApiError(status: number, payload: unknown): ApiError {
-  const body = (payload ?? {}) as Partial<ApiErrorPayload>
+  const body = (payload ?? {}) as Partial<ApiErrorEnvelope>
+  const details = body.error?.details
 
   return new ApiError({
     message: typeof body.message === 'string' ? body.message : undefined,
     status,
-    code: body.code,
-    fieldErrors: body.errors,
+    code: body.error?.code,
+    fieldErrors: toFieldErrors(details),
+    details,
+    requestId: body.requestId,
     payload,
   })
 }
 
-async function request<TResponse>(
+/**
+ * Unwrap the success envelope.
+ *
+ * Every endpoint answers `{ success, message, data, requestId, timestamp }`, so
+ * callers receive `data` and never see the wrapper. A bare body is tolerated for
+ * the occasional endpoint that forgets it.
+ */
+function unwrap<TResponse>(payload: unknown): TResponse {
+  if (payload && typeof payload === 'object' && 'data' in payload && 'success' in payload) {
+    return (payload as { data: TResponse }).data
+  }
+
+  return payload as TResponse
+}
+
+interface SendOptions extends RequestOptions {
+  /** Guards the retry so one request can never trigger a refresh loop. */
+  isRetry?: boolean
+}
+
+async function send<TResponse>(
   method: HttpMethod,
   path: string,
-  body?: unknown,
-  options: RequestOptions = {},
+  body: unknown,
+  options: SendOptions,
 ): Promise<TResponse> {
   const {
     params,
@@ -89,6 +160,7 @@ async function request<TResponse>(
     timeout = appConfig.api.timeout,
     headers,
     signal,
+    isRetry,
     ...init
   } = options
 
@@ -136,34 +208,68 @@ async function request<TResponse>(
   }
 
   const payload = await parseBody(response)
+  if (response.ok) return unwrap<TResponse>(payload)
 
-  if (!response.ok) {
-    if (response.status === HTTP_STATUS.unauthorized) onUnauthorized?.()
-    throw toApiError(response.status, payload)
+  const error = toApiError(response.status, payload)
+
+  // ── The refresh-on-401 interceptor ───────────────────────────────
+  //
+  // Only an authenticated call whose failure a *new access token* could fix is
+  // worth retrying. A session-ending code (reuse detected, session revoked) is
+  // final, and retrying it would burn the refresh token for nothing.
+  const canRetry =
+    !skipAuth &&
+    !isRetry &&
+    response.status === HTTP_STATUS.unauthorized &&
+    Boolean(error.code && REFRESHABLE_CODES.has(error.code)) &&
+    Boolean(refreshTokens)
+
+  if (canRetry) {
+    const refreshed = await refreshOnce()
+
+    // Exactly one retry: `isRetry` makes a second failure terminal, so a server
+    // that keeps answering 401 cannot spin this forever.
+    if (refreshed) return send<TResponse>(method, path, body, { ...options, isRetry: true })
   }
 
-  return payload as TResponse
+  // Sign out only when the 401 is genuinely about the *session*.
+  //
+  // Not every 401 is: `/auth/change-password` answers 401 with
+  // INVALID_CREDENTIALS when the *current password* is wrong, and treating that
+  // as a dead session would sign a user out for a typo. So this fires for
+  // session-ending codes, for a token code that survived the retry above, and
+  // for a code-less 401 (unknown, so assume the worst) — but never for a
+  // business 401 that happens to share the status.
+  if (response.status === HTTP_STATUS.unauthorized && !skipAuth) {
+    const isSessionFailure =
+      error.code === undefined || error.isSessionEnding || REFRESHABLE_CODES.has(error.code)
+
+    if (isSessionFailure) onUnauthorized?.()
+  }
+
+  throw error
 }
 
 /**
  * Thin, typed `fetch` wrapper: base URL, auth header, query serialisation,
- * timeouts and uniform errors. Deliberately dependency-free.
+ * timeouts, envelope unwrapping, uniform errors, and transparent token refresh.
+ * Deliberately dependency-free.
  */
 export const httpClient = {
-  get: <TResponse>(path: string, options?: RequestOptions) =>
-    request<TResponse>('GET', path, undefined, options),
+  get: <TResponse>(path: string, options: RequestOptions = {}) =>
+    send<TResponse>('GET', path, undefined, options),
 
-  post: <TResponse>(path: string, body?: unknown, options?: RequestOptions) =>
-    request<TResponse>('POST', path, body, options),
+  post: <TResponse>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    send<TResponse>('POST', path, body, options),
 
-  put: <TResponse>(path: string, body?: unknown, options?: RequestOptions) =>
-    request<TResponse>('PUT', path, body, options),
+  put: <TResponse>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    send<TResponse>('PUT', path, body, options),
 
-  patch: <TResponse>(path: string, body?: unknown, options?: RequestOptions) =>
-    request<TResponse>('PATCH', path, body, options),
+  patch: <TResponse>(path: string, body?: unknown, options: RequestOptions = {}) =>
+    send<TResponse>('PATCH', path, body, options),
 
-  delete: <TResponse>(path: string, options?: RequestOptions) =>
-    request<TResponse>('DELETE', path, undefined, options),
+  delete: <TResponse>(path: string, options: RequestOptions = {}) =>
+    send<TResponse>('DELETE', path, undefined, options),
 }
 
 export type HttpClient = typeof httpClient

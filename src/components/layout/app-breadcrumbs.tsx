@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/breadcrumb'
 import { appConfig } from '@/config/app.config'
 import { NAVIGATION, flattenNavigation } from '@/config/navigation.config'
+import { useBreadcrumbs } from '@/hooks/use-breadcrumbs'
 import type { BreadcrumbItem as Crumb, NavGroup, NavItem } from '@/types/navigation.types'
 import { titleCase } from '@/utils/string'
 
@@ -39,10 +40,16 @@ function buildCrumbs(pathname: string, groups: NavGroup[]): Crumb[] {
   })
 }
 
-/** Breadcrumb trail for the header; renders nothing at the shell root. */
+/**
+ * Breadcrumb trail for the header; renders nothing at the shell root.
+ *
+ * A screen that published a trail via `useSetBreadcrumbs` wins; otherwise the
+ * trail is derived from the URL.
+ */
 export function AppBreadcrumbs({ groups = NAVIGATION }: { groups?: NavGroup[] }) {
   const { pathname } = useLocation()
-  const crumbs = buildCrumbs(pathname, groups)
+  const { items: override } = useBreadcrumbs()
+  const crumbs = override ?? buildCrumbs(pathname, groups)
 
   if (!appConfig.layout.showBreadcrumbs || crumbs.length === 0) return null
 

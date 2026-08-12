@@ -2,7 +2,9 @@ import type { RouteObject } from 'react-router'
 
 import type { ModuleDefinition } from '@/types/module.types'
 import type { NavGroup } from '@/types/navigation.types'
+import { adminManagerModule } from './admin-manager'
 import { dashboardModule } from './dashboard'
+import { userManagerModule } from './user-manager'
 
 /**
  * The one place modules are plugged into the app.
@@ -11,12 +13,16 @@ import { dashboardModule } from './dashboard'
  * up any navigation it contributes. Nothing else in the framework imports a
  * module directly — that boundary is what keeps the shell reusable.
  *
- * Planned: admin-manager, user-manager, cms, settings, enquiry-manager,
+ * Planned: cms, settings, enquiry-manager,
  * email-templates, help-support, analytics. Their paths are already reserved in
  * `@/router/paths` and listed in `@/config/navigation.config`, so each can be
  * dropped in independently.
  */
-export const MODULE_REGISTRY: ModuleDefinition[] = [dashboardModule]
+export const MODULE_REGISTRY: ModuleDefinition[] = [
+  dashboardModule,
+  userManagerModule,
+  adminManagerModule,
+]
 
 /** Registered modules that are switched on. */
 export function getEnabledModules(

@@ -20,7 +20,8 @@ interface SidebarNavProps {
 }
 
 const ROW_CLASSES = cn(
-  'group/nav flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium',
+  // `relative` anchors the collapsed-rail badge dot.
+  'group/nav relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium',
   'text-sidebar-foreground/75 transition-colors outline-none',
   'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
   'focus-visible:ring-[3px] focus-visible:ring-sidebar-ring/50',
@@ -38,6 +39,34 @@ function containsActivePath(item: NavItem, pathname: string): boolean {
   return Boolean(item.children?.some((child) => containsActivePath(child, pathname)))
 }
 
+/** True when this entry, or anything nested under it, carries a badge. */
+function hasBadge(item: NavItem): boolean {
+  if (item.badge) return true
+  return Boolean(item.children?.some(hasBadge))
+}
+
+/** The badge pill shown on the right of an expanded row. */
+function NavBadge({ children }: { children: string }) {
+  return (
+    <span className="ml-auto shrink-0 rounded-full bg-sidebar-primary/10 px-1.5 py-0.5 text-caption text-sidebar-primary">
+      {children}
+    </span>
+  )
+}
+
+/**
+ * Collapsed rows have no room for a pill, so a badge anywhere in the subtree
+ * becomes a dot on the icon — otherwise the signal vanishes on the icon rail.
+ */
+function NavBadgeDot() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute top-1 right-1 size-1.5 rounded-full bg-sidebar-primary"
+    />
+  )
+}
+
 /** A leaf entry: internal link, or external anchor when `external` is set. */
 function NavLeaf({
   item,
@@ -51,12 +80,9 @@ function NavLeaf({
   onNavigate?: () => void
 }) {
   const label = <span className={cn('truncate', collapsed && 'sr-only')}>{item.label}</span>
-  const badge =
-    item.badge && !collapsed ? (
-      <span className="ml-auto rounded-full bg-sidebar-primary/10 px-1.5 py-0.5 text-caption text-sidebar-primary">
-        {item.badge}
-      </span>
-    ) : null
+
+  let badge: React.ReactNode = null
+  if (item.badge) badge = collapsed ? <NavBadgeDot /> : <NavBadge>{item.badge}</NavBadge>
 
   const icon = item.icon ? (
     <item.icon className="size-4 shrink-0" />
@@ -141,6 +167,7 @@ function NavBranch({
           >
             {item.icon ? <item.icon className="size-4 shrink-0" /> : null}
             <span className="sr-only">{item.label}</span>
+            {hasBadge(item) && <NavBadgeDot />}
           </NavLink>
         </TooltipTrigger>
         <TooltipContent side="right">{item.label}</TooltipContent>
@@ -155,9 +182,12 @@ function NavBranch({
       >
         {item.icon ? <item.icon className="size-4 shrink-0" /> : null}
         <span className="truncate">{item.label}</span>
+        {item.badge && <NavBadge>{item.badge}</NavBadge>}
         <ChevronRight
           className={cn(
-            'ml-auto size-4 shrink-0 transition-transform duration-200',
+            'size-4 shrink-0 transition-transform duration-200',
+            // The badge already claimed `ml-auto`; without one the chevron does.
+            item.badge ? 'ml-1.5' : 'ml-auto',
             isOpen && 'rotate-90',
           )}
           aria-hidden="true"

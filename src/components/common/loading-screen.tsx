@@ -1,6 +1,5 @@
-import { Loader2 } from 'lucide-react'
-
 import { Skeleton } from '@/components/ui/skeleton'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/utils/cn'
 
 /** Spinner shown while a lazy route chunk resolves. */
@@ -13,11 +12,10 @@ export function LoadingScreen({
 }) {
   return (
     <div
-      role="status"
-      aria-live="polite"
       className={cn('flex min-h-64 w-full flex-1 items-center justify-center gap-2', className)}
     >
-      <Loader2 className="size-5 animate-spin text-muted-foreground" aria-hidden="true" />
+      {/* `Spinner` carries the live region; the visible label is its text twin. */}
+      <Spinner className="text-muted-foreground" label={label} />
       <span className="text-body text-muted-foreground">{label}</span>
     </div>
   )

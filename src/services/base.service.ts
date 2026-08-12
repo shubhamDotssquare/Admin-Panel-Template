@@ -1,13 +1,11 @@
-import type {
-  ApiResponse,
-  ListQueryParams,
-  PaginatedResponse,
-  RequestOptions,
-} from '@/types/api.types'
+import type { ListQueryParams, PaginatedResponse, RequestOptions } from '@/types/api.types'
 import { httpClient } from './http-client'
 
 /**
  * CRUD scaffolding for a REST resource.
+ *
+ * `httpClient` already unwraps the `{ success, message, data }` envelope, so
+ * these return the payload directly — do not unwrap again.
  *
  * A module creates its service by naming its resource path and payload types:
  *
@@ -36,56 +34,29 @@ export function createResourceService<
   return {
     resourcePath,
 
-    list: async (
+    list: (
       params?: ListQueryParams,
       options?: RequestOptions,
-    ): Promise<PaginatedResponse<TEntity>> => {
-      const response = await httpClient.get<ApiResponse<PaginatedResponse<TEntity>>>(
-        resourcePath,
-        { ...options, params: { ...params, ...options?.params } },
-      )
-      return response.data
-    },
+    ): Promise<PaginatedResponse<TEntity>> =>
+      httpClient.get<PaginatedResponse<TEntity>>(resourcePath, {
+        ...options,
+        params: { ...params, ...options?.params },
+      }),
 
-    get: async (id: TId, options?: RequestOptions): Promise<TEntity> => {
-      const response = await httpClient.get<ApiResponse<TEntity>>(itemPath(id), options)
-      return response.data
-    },
+    get: (id: TId, options?: RequestOptions): Promise<TEntity> =>
+      httpClient.get<TEntity>(itemPath(id), options),
 
-    create: async (payload: TCreateDto, options?: RequestOptions): Promise<TEntity> => {
-      const response = await httpClient.post<ApiResponse<TEntity>>(
-        resourcePath,
-        payload,
-        options,
-      )
-      return response.data
-    },
+    create: (payload: TCreateDto, options?: RequestOptions): Promise<TEntity> =>
+      httpClient.post<TEntity>(resourcePath, payload, options),
 
-    update: async (
-      id: TId,
-      payload: TUpdateDto,
-      options?: RequestOptions,
-    ): Promise<TEntity> => {
-      const response = await httpClient.put<ApiResponse<TEntity>>(
-        itemPath(id),
-        payload,
-        options,
-      )
-      return response.data
-    },
+    update: (id: TId, payload: TUpdateDto, options?: RequestOptions): Promise<TEntity> =>
+      httpClient.put<TEntity>(itemPath(id), payload, options),
 
-    patch: async (
+    patch: (
       id: TId,
       payload: Partial<TUpdateDto>,
       options?: RequestOptions,
-    ): Promise<TEntity> => {
-      const response = await httpClient.patch<ApiResponse<TEntity>>(
-        itemPath(id),
-        payload,
-        options,
-      )
-      return response.data
-    },
+    ): Promise<TEntity> => httpClient.patch<TEntity>(itemPath(id), payload, options),
 
     remove: (id: TId, options?: RequestOptions): Promise<unknown> =>
       httpClient.delete(itemPath(id), options),

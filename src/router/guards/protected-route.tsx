@@ -1,7 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router'
 
+import { LoadingScreen } from '@/components/common/loading-screen'
 import { appConfig } from '@/config/app.config'
-import { sessionService } from '@/services/session.service'
+import { useAuth } from '@/hooks/use-auth'
 
 /**
  * Gate for the authenticated shell.
@@ -10,13 +11,27 @@ import { sessionService } from '@/services/session.service'
  * backend. Once enabled, unauthenticated visitors are redirected to the login
  * path with a `redirectTo` param carrying their original destination.
  *
- * Swap `sessionService.hasSession()` for a real session hook when the auth
- * module lands — this is the only place that needs to change.
+ * The `loading` state is load-bearing: on a hard refresh a token exists before
+ * the user has been resolved, and redirecting during that window would sign
+ * people out on every page load.
  */
 export function ProtectedRoute({ children }: { children?: React.ReactNode }) {
   const location = useLocation()
+  const { isAuthenticated, isLoading } = useAuth()
 
-  if (appConfig.auth.enabled && !sessionService.hasSession()) {
+  if (!appConfig.auth.enabled) {
+    return children ? <>{children}</> : <Outlet />
+  }
+
+  if (isLoading) {
+    return (
+      <div className="grid min-h-svh place-items-center">
+        <LoadingScreen label="Restoring your session…" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
     const from = `${location.pathname}${location.search}`
     const target = `${appConfig.loginPath}?${appConfig.auth.redirectParam}=${encodeURIComponent(from)}`
 

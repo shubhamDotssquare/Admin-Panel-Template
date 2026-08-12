@@ -75,6 +75,14 @@
   --layout-sidebar-width-collapsed: 3.5rem;
   --layout-content-max-width: 96rem;
   --layout-content-padding: 1.5rem;
+
+  /* ── Composition rhythm (consumed by page and form primitives) ─ */
+  /** Vertical gap between the major blocks of a page. */
+  --space-section: 1.5rem;
+  /** Vertical gap between fields in a form. */
+  --space-field: 1rem;
+  /** Gap between a label, its control and its message. */
+  --space-field-inner: 0.375rem;
 }
 
 .dark {
@@ -196,7 +204,18 @@
   --spacing-header: var(--layout-header-height);
   --spacing-sidebar: var(--layout-sidebar-width);
   --spacing-sidebar-collapsed: var(--layout-sidebar-width-collapsed);
-  --spacing-content: var(--layout-content-padding);
+  /**
+   * The page gutter is deliberately NOT named `content`: `max-w-*` resolves the
+   * `--spacing-*` namespace before `--container-*`, so a `--spacing-content`
+   * next to `--container-content` silently makes `max-w-content` emit the
+   * padding (1.5rem) instead of the max width, collapsing every page.
+   */
+  --spacing-gutter: var(--layout-content-padding);
+
+  /* Composition rhythm: `gap-section`, `gap-field`, `gap-field-inner`. */
+  --spacing-section: var(--space-section);
+  --spacing-field: var(--space-field);
+  --spacing-field-inner: var(--space-field-inner);
 
   --container-content: var(--layout-content-max-width);
 }

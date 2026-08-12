@@ -20,6 +20,14 @@ export const appConfig = {
     enabled: env.authEnabled,
     /** Query param used to return the user to their original destination. */
     redirectParam: 'redirectTo',
+    /**
+     * Password policy, mirroring the server's. Enforced client-side for fast
+     * feedback only — the server remains the source of truth.
+     */
+    passwordMinLength: 10,
+    passwordMaxLength: 72,
+    /** Query param carrying the reset token from the emailed link. */
+    resetTokenParam: 'token',
   },
 
   api: {
@@ -32,6 +40,10 @@ export const appConfig = {
     defaultSidebarCollapsed: false,
     /** Render the breadcrumb trail in the header. */
     showBreadcrumbs: true,
+    /** Render the header search trigger and its ⌘K palette. */
+    showSearch: true,
+    /** Render the header notification panel. */
+    showNotifications: true,
     /** Constrain page content to `--layout-content-max-width`. */
     constrainContentWidth: true,
   },

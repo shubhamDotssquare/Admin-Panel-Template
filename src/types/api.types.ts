@@ -7,11 +7,38 @@
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-/** Envelope every endpoint is expected to return. */
+/** Envelope every endpoint returns on success. */
 export interface ApiResponse<TData = unknown> {
-  success: boolean
+  success: true
   message?: string
   data: TData
+  /** Correlates a response with the server's logs — surfaced on failures. */
+  requestId?: string
+  timestamp?: string
+}
+
+/** One field-level failure inside a 422 `error.details`. */
+export interface ApiErrorDetail {
+  field?: string
+  message: string
+  /** Present on `OTP_RESEND_TOO_SOON`; drives the resend countdown. */
+  retryAfterSeconds?: number
+}
+
+/** Envelope every endpoint returns on any 4xx/5xx. */
+export interface ApiErrorEnvelope {
+  success: false
+  message: string
+  error: {
+    /**
+     * Machine-readable and stable. **Branch on this, never on `message`** —
+     * message copy is free to change server-side at any time.
+     */
+    code: string
+    details?: ApiErrorDetail[]
+  }
+  requestId?: string
+  timestamp?: string
 }
 
 export interface PaginationMeta {
@@ -38,12 +65,6 @@ export interface ListQueryParams {
 
 /** Field-level validation failures, keyed by field name. */
 export type FieldErrors = Record<string, string[]>
-
-export interface ApiErrorPayload {
-  message: string
-  code?: string
-  errors?: FieldErrors
-}
 
 /** Options accepted by the http client on top of the native `fetch` init. */
 export interface RequestOptions extends Omit<RequestInit, 'method' | 'body'> {

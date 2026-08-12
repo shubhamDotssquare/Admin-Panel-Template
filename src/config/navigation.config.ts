@@ -120,6 +120,12 @@ export const NAVIGATION: NavGroup[] = [
             label: 'Appearance',
             path: route(PATHS.settings, 'appearance'),
           },
+          {
+            id: 'settings-security',
+            label: 'Security',
+            path: route(PATHS.settings, 'security'),
+          },
+          { id: 'settings-devices', label: 'Devices', path: route(PATHS.settings, 'devices') },
         ],
       },
       {

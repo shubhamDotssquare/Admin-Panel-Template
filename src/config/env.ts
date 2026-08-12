@@ -23,7 +23,7 @@ function readBoolean(value: string | undefined, fallback: boolean): boolean {
 export const env = {
   appName: readString(import.meta.env.VITE_APP_NAME, 'Admin Panel'),
   appShortName: readString(import.meta.env.VITE_APP_SHORT_NAME, 'AP'),
-  apiBaseUrl: readString(import.meta.env.VITE_API_BASE_URL, '/api'),
+  apiBaseUrl: readString(import.meta.env.VITE_API_BASE_URL, 'http://localhost:4000/api/v1'),
   apiTimeout: readNumber(import.meta.env.VITE_API_TIMEOUT, 30_000),
   authEnabled: readBoolean(import.meta.env.VITE_AUTH_ENABLED, false),
   defaultTheme: readString(import.meta.env.VITE_DEFAULT_THEME, 'system'),

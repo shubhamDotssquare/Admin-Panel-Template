@@ -15,7 +15,7 @@ export function PageContainer({ children, fullWidth, className }: PageContainerP
   return (
     <div
       className={cn(
-        'flex w-full flex-col gap-6 p-content',
+        'flex w-full min-w-0 flex-col gap-section p-gutter',
         constrain && 'mx-auto max-w-content',
         className,
       )}

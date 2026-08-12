@@ -12,6 +12,9 @@ export const PATHS = {
     login: '/login',
     forgotPassword: '/forgot-password',
     resetPassword: '/reset-password',
+    register: '/register',
+    /** Target of the emailed confirmation link; reads `?token=`. */
+    verifyEmail: '/verify-email',
   },
 
   // Shell screens (rendered inside AdminLayout).
