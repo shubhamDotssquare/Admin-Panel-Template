@@ -1,36 +1,27 @@
-import { Activity, Ban, CheckCircle2, History, Info, Pencil, StickyNote } from 'lucide-react'
+import { Ban, Braces, CheckCircle2, Info, Pencil, Power } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
 import { EmptyState } from '@/components/common/empty-state'
 import { PageContainer } from '@/components/common/page-container'
-import {
-  DescriptionList,
-  DetailPage,
-  NoteList,
-  StatusBadge,
-  Timeline,
-} from '@/components/patterns'
+import { DescriptionList, DetailPage, StatusBadge } from '@/components/patterns'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useConfirm } from '@/hooks/use-confirm'
+import { usePermission } from '@/hooks/use-permission'
 import { PATHS, route } from '@/router/paths'
-import { formatDate, formatDateTime, formatRelativeTime } from '@/utils/format'
+import { PERMISSIONS } from '@/types/rbac.types'
+import { formatDate, formatRelativeTime } from '@/utils/format'
 import { notify } from '@/utils/toast'
-import { users, useSetUserStatus } from '../services/user.queries'
+import { users, useUserLifecycle } from '../services/user.queries'
 import { USER_STATUS, userFullName } from '../types'
 
-/**
- * A user's profile.
- *
- * Every section is a framework pattern — the module supplies data and decides
- * which tabs a user record has, and owns no layout of its own.
- */
 export function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>()
   const confirm = useConfirm()
 
   const { data: user, isLoading, isError } = users.useDetail(userId)
-  const setStatus = useSetUserStatus()
+  const lifecycle = useUserLifecycle()
+  const canUpdate = usePermission(PERMISSIONS.usersUpdate)
 
   if (isError || (!isLoading && !user)) {
     return (
@@ -49,25 +40,27 @@ export function UserDetailPage() {
   }
 
   const name = user ? userFullName(user) : 'Loading…'
-  const isSuspended = user?.status === 'SUSPENDED'
 
-  const toggleStatus = async (): Promise<void> => {
+  const run = async (
+    action: 'activate' | 'deactivate' | 'suspend',
+    confirmation?: { title: string; description?: string },
+  ): Promise<void> => {
     if (!user) return
 
-    const next = isSuspended ? 'ACTIVE' : 'SUSPENDED'
-    if (next === 'SUSPENDED') {
+    if (confirmation) {
       const ok = await confirm({
-        title: `Suspend ${name}?`,
-        description: 'They will be signed out and blocked from signing in again.',
-        confirmLabel: 'Suspend',
+        ...confirmation,
+        confirmLabel: 'Confirm',
         tone: 'destructive',
       })
       if (!ok) return
     }
 
-    await setStatus.mutateAsync({ id: user.id, status: next })
-    notify.success(next === 'ACTIVE' ? `${name} activated` : `${name} suspended`)
+    await lifecycle.mutateAsync({ id: user.id, action })
+    notify.success(`${name} ${action}d`)
   }
+
+  const metadataEntries = Object.entries(user?.metadata ?? {})
 
   return (
     <DetailPage
@@ -81,17 +74,18 @@ export function UserDetailPage() {
       meta={
         user
           ? [
-              { label: 'Groups', value: user.groups?.join(', ') || '—' },
+              { label: 'Phone', value: user.phone || '—' },
               {
                 label: 'Last seen',
                 value: user.lastLoginAt ? formatRelativeTime(user.lastLoginAt) : 'Never',
               },
-              { label: 'Joined', value: user.createdAt ? formatDate(user.createdAt) : '—' },
+              { label: 'Created', value: user.createdAt ? formatDate(user.createdAt) : '—' },
             ]
           : undefined
       }
       actions={
-        user && (
+        user &&
+        canUpdate && (
           <>
             <Button asChild variant="outline" size="sm">
               <Link to={route(PATHS.userManager, user.id, 'edit')}>
@@ -100,15 +94,40 @@ export function UserDetailPage() {
               </Link>
             </Button>
 
-            <Button
-              variant={isSuspended ? 'default' : 'destructive'}
-              size="sm"
-              disabled={setStatus.isPending}
-              onClick={() => void toggleStatus()}
-            >
-              {isSuspended ? <CheckCircle2 className="size-4" /> : <Ban className="size-4" />}
-              {isSuspended ? 'Activate' : 'Suspend'}
-            </Button>
+            {user.status !== 'ACTIVE' && (
+              <Button
+                size="sm"
+                disabled={lifecycle.isPending}
+                onClick={() => void run('activate')}
+              >
+                <CheckCircle2 className="size-4" />
+                Activate
+              </Button>
+            )}
+
+            {user.status !== 'INACTIVE' && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={lifecycle.isPending}
+                onClick={() => void run('deactivate', { title: `Deactivate ${name}?` })}
+              >
+                <Power className="size-4" />
+                Deactivate
+              </Button>
+            )}
+
+            {user.status !== 'SUSPENDED' && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={lifecycle.isPending}
+                onClick={() => void run('suspend', { title: `Suspend ${name}?` })}
+              >
+                <Ban className="size-4" />
+                Suspend
+              </Button>
+            )}
           </>
         )
       }
@@ -135,9 +154,8 @@ export function UserDetailPage() {
                       label: 'Email verified',
                       value: user?.emailVerified ? 'Verified' : 'Not verified',
                     },
-                    { label: 'Groups', value: user?.groups?.join(', ') || '—' },
+                    { label: 'Last sign-in IP', value: user?.lastLoginIp },
                     { label: 'User ID', value: user?.id },
-                    { label: 'Internal notes', full: true, value: user?.notes },
                   ]}
                 />
               </CardContent>
@@ -145,102 +163,41 @@ export function UserDetailPage() {
           ),
         },
         {
-          id: 'activity',
-          label: 'Activity',
-          icon: Activity,
+          id: 'metadata',
+          label: 'Metadata',
+          icon: Braces,
+          badge: metadataEntries.length || undefined,
           content: (
             <Card>
-              <CardContent>
-                <Timeline
-                  isLoading={isLoading}
-                  // Real activity arrives when an events endpoint exists; the
-                  // record's own timestamps are what the API gives us today.
-                  events={
-                    user
-                      ? [
-                          ...(user.lastLoginAt
-                            ? [
-                                {
-                                  id: 'last-login',
-                                  title: 'Signed in',
-                                  timestamp: user.lastLoginAt,
-                                  tone: 'info' as const,
-                                },
-                              ]
-                            : []),
-                          ...(user.createdAt
-                            ? [
-                                {
-                                  id: 'created',
-                                  title: 'Account created',
-                                  timestamp: user.createdAt,
-                                  tone: 'success' as const,
-                                },
-                              ]
-                            : []),
-                        ]
-                      : []
-                  }
-                  emptyTitle="No activity recorded"
-                  emptyDescription="Sign-ins and changes will appear here."
-                />
-              </CardContent>
-            </Card>
-          ),
-        },
-        {
-          id: 'notes',
-          label: 'Notes',
-          icon: StickyNote,
-          content: (
-            <Card>
-              <CardContent>
-                <NoteList
-                  isLoading={isLoading}
-                  notes={
-                    user?.notes
-                      ? [
-                          {
-                            id: 'note',
-                            body: user.notes,
-                            author: 'Internal',
-                            createdAt: user.createdAt,
-                          },
-                        ]
-                      : []
-                  }
-                  emptyTitle="No notes"
-                  emptyDescription="Add notes from the edit screen until a notes endpoint exists."
-                />
-              </CardContent>
-            </Card>
-          ),
-        },
-        {
-          id: 'history',
-          label: 'History',
-          icon: History,
-          content: (
-            <Card>
-              <CardContent>
-                <Timeline
-                  isLoading={isLoading}
-                  events={
-                    user?.createdAt
-                      ? [
-                          {
-                            id: 'created',
-                            title: 'Record created',
-                            timestamp: user.createdAt,
-                            description: formatDateTime(user.createdAt),
-                            tone: 'success',
-                          },
-                        ]
-                      : []
-                  }
-                  emptyTitle="No changes recorded"
-                  emptyDescription="Edits will be listed here once auditing is enabled."
-                />
+              <CardContent className="flex flex-col gap-3">
+                {metadataEntries.length === 0 ? (
+                  <EmptyState
+                    icon={Braces}
+                    title="No metadata"
+                    description="Add free-form JSON from the edit screen."
+                    className="border-none"
+                  />
+                ) : (
+                  <>
+                    <DescriptionList
+                      items={metadataEntries.map(([key, value]) => ({
+                        label: key,
+                        value:
+                          typeof value === 'object' && value !== null ? (
+                            <code className="font-mono text-caption">
+                              {JSON.stringify(value)}
+                            </code>
+                          ) : (
+                            String(value)
+                          ),
+                      }))}
+                    />
+                    <p className="text-caption text-muted-foreground">
+                      Editing replaces this object wholesale — the edit form loads the current
+                      value so nothing is lost.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ),

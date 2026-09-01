@@ -38,7 +38,7 @@ export function createResourceService<
       params?: ListQueryParams,
       options?: RequestOptions,
     ): Promise<PaginatedResponse<TEntity>> =>
-      httpClient.get<PaginatedResponse<TEntity>>(resourcePath, {
+      httpClient.list<TEntity>(resourcePath, {
         ...options,
         params: { ...params, ...options?.params },
       }),

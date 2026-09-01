@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { NAVIGATION } from '@/config/navigation.config'
 import { useDisclosure } from '@/hooks/use-disclosure'
+import { useNavigation } from '@/hooks/use-navigation'
 import type { IconComponent } from '@/types/common.types'
 import type { NavGroup, NavItem } from '@/types/navigation.types'
 import { cn } from '@/utils/cn'
@@ -94,7 +94,7 @@ function isMacPlatform(): boolean {
  * their own records pass them through `extraItems`.
  */
 export function AppSearch({
-  groups = NAVIGATION,
+  groups,
   extraItems = [],
   placeholder = 'Search pages…',
   limit = 8,
@@ -107,7 +107,13 @@ export function AppSearch({
 
   const shortcutLabel = useMemo(() => (isMacPlatform() ? '⌘K' : 'Ctrl K'), [])
 
-  const index = useMemo(() => [...buildIndex(groups), ...extraItems], [groups, extraItems])
+  // Filtered like the sidebar: search must not surface a section the admin is
+  // not allowed to open.
+  const visibleGroups = useNavigation(groups)
+  const index = useMemo(
+    () => [...buildIndex(visibleGroups), ...extraItems],
+    [visibleGroups, extraItems],
+  )
 
   const results = useMemo(() => {
     const trimmed = query.trim().toLowerCase()

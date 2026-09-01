@@ -5,8 +5,8 @@ import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { NAVIGATION } from '@/config/navigation.config'
 import { useLayout } from '@/hooks/use-layout'
+import { useNavigation } from '@/hooks/use-navigation'
 import type { NavGroup } from '@/types/navigation.types'
 import { cn } from '@/utils/cn'
 
@@ -38,7 +38,9 @@ function SidebarBody({
  * Desktop renders a fixed rail that collapses to icons; below `lg` the same
  * navigation is served from an off-canvas sheet.
  */
-export function AppSidebar({ groups = NAVIGATION }: AppSidebarProps) {
+export function AppSidebar({ groups }: AppSidebarProps) {
+  // Permission-filtered: entries the signed-in admin cannot reach are dropped.
+  const visibleGroups = useNavigation(groups)
   const {
     isSidebarCollapsed,
     setSidebarCollapsed,
@@ -58,7 +60,7 @@ export function AppSidebar({ groups = NAVIGATION }: AppSidebarProps) {
           </SheetHeader>
 
           <SidebarBody
-            groups={groups}
+            groups={visibleGroups}
             collapsed={false}
             onNavigate={() => setMobileNavOpen(false)}
           />
@@ -86,7 +88,7 @@ export function AppSidebar({ groups = NAVIGATION }: AppSidebarProps) {
         <AppBrand compact={isSidebarCollapsed} />
       </div>
 
-      <SidebarBody groups={groups} collapsed={isSidebarCollapsed} />
+      <SidebarBody groups={visibleGroups} collapsed={isSidebarCollapsed} />
 
       <div
         className={cn(

@@ -1,62 +1,69 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+import { API_ENDPOINTS } from '@/constants/api-endpoints'
 import { createResourceQueries } from '@/lib/create-resource-queries'
+import { createQueryKeys } from '@/lib/query-keys'
 import { httpClient } from '@/services/http-client'
-import type { Admin, AdminStatus, CreateAdminDto, Role, UpdateAdminDto } from '../types'
-
-const ADMINS = '/admins'
-const ROLES = '/roles'
+import { rbacService } from '@/services/rbac.service'
+import { useQuery } from '@tanstack/react-query'
+import type { Admin, CreateAdminDto, UpdateAdminDto } from '../types'
 
 export const admins = createResourceQueries<Admin, CreateAdminDto, UpdateAdminDto>(
   'admins',
-  ADMINS,
+  API_ENDPOINTS.admins.root,
 )
 
-export const roles = createResourceQueries<Role, Partial<Role>>('roles', ROLES)
+/** Cache namespace for an admin's RBAC role assignments. */
+export const adminRoleKeys = createQueryKeys('admin-roles')
 
-/** Status changes are an action, not a field edit — see the user module. */
-export function useSetAdminStatus() {
-  const queryClient = useQueryClient()
+/** Which lifecycle transition to apply. Each is its own endpoint. */
+export type AdminLifecycleAction = 'activate' | 'deactivate' | 'suspend'
 
-  return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: AdminStatus }) =>
-      httpClient.patch<Admin>(`${ADMINS}/${id}/status`, { status }),
-    meta: { invalidates: [admins.keys.all()] },
-    onSuccess: (updated) => {
-      queryClient.setQueryData(admins.keys.detail(updated.id), updated)
-    },
-  })
+const LIFECYCLE_PATH: Record<AdminLifecycleAction, (id: string) => string> = {
+  activate: API_ENDPOINTS.admins.activate,
+  deactivate: API_ENDPOINTS.admins.deactivate,
+  suspend: API_ENDPOINTS.admins.suspend,
 }
 
 /**
- * Replace an administrator's roles.
+ * Activate, deactivate or suspend an admin.
  *
- * Separate from the record update so role changes can be audited and authorised
- * on their own — granting access is the one edit that most warrants it.
+ * Separate endpoints rather than a status `PATCH`, because deactivate and
+ * suspend also end that admin's sessions server-side — they are actions, not
+ * field edits.
  */
-export function useAssignRoles() {
+export function useAdminLifecycle() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, roles: next }: { id: string; roles: string[] }) =>
-      httpClient.put<Admin>(`${ADMINS}/${id}/roles`, { roles: next }),
+    mutationFn: ({ id, action }: { id: string; action: AdminLifecycleAction }) =>
+      httpClient.post<Admin>(LIFECYCLE_PATH[action](id)),
     meta: { invalidates: [admins.keys.all()] },
     onSuccess: (updated) => {
-      queryClient.setQueryData(admins.keys.detail(updated.id), updated)
+      if (updated?.id) queryClient.setQueryData(admins.keys.detail(updated.id), updated)
     },
   })
 }
 
-/** Every role, for the pickers. Roles are few and change rarely. */
-export function useRoleOptions() {
-  const query = roles.useList({ perPage: 100 })
+/** The RBAC roles one admin holds, plus what they add up to. */
+export function useAdminRoles(adminId: string | undefined) {
+  return useQuery({
+    queryKey: adminRoleKeys.detail(adminId ?? ''),
+    queryFn: () => rbacService.adminRoles(adminId as string),
+    enabled: Boolean(adminId),
+  })
+}
 
-  return {
-    ...query,
-    options: (query.data?.items ?? []).map((role) => ({
-      label: role.name,
-      value: role.id,
-      description: role.description,
-    })),
-  }
+export function useAssignRole(adminId: string) {
+  return useMutation({
+    mutationFn: (roleId: string) => rbacService.assignRole(adminId, roleId),
+    meta: { invalidates: [adminRoleKeys.all(), admins.keys.all()] },
+  })
+}
+
+export function useRevokeRole(adminId: string) {
+  return useMutation({
+    mutationFn: (roleId: string) => rbacService.revokeRole(adminId, roleId),
+    meta: { invalidates: [adminRoleKeys.all(), admins.keys.all()] },
+  })
 }

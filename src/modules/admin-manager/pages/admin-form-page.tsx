@@ -7,7 +7,7 @@ import { PATHS, route } from '@/router/paths'
 import { notify } from '@/utils/toast'
 import { AdminForm } from '../components/admin-form'
 import { admins } from '../services/admin.queries'
-import { adminFullName } from '../types'
+import { adminFullName, type CreateAdminDto, type UpdateAdminDto } from '../types'
 
 /** Create and edit an administrator, sharing one form. */
 export function AdminFormPage() {
@@ -31,8 +31,8 @@ export function AdminFormPage() {
       }
       description={
         isEdit
-          ? 'Update this staff account and the roles it holds.'
-          : 'Send an invitation and assign the roles they should hold.'
+          ? 'Update this account. Passwords are changed elsewhere.'
+          : 'Create the account, then assign roles from its profile.'
       }
       backTo={backTo}
       backLabel={isEdit ? 'Back to profile' : 'Back to administrators'}
@@ -56,14 +56,15 @@ export function AdminFormPage() {
         onCancel={() => navigate(backTo)}
         onSubmit={async (values) => {
           if (isEdit && adminId) {
-            await update.mutateAsync({ id: adminId, payload: values })
+            // The edit schema omits `password`; the API rejects it here anyway.
+            await update.mutateAsync({ id: adminId, payload: values as UpdateAdminDto })
             notify.success('Administrator updated')
             navigate(route(PATHS.adminManager, adminId))
             return
           }
 
-          const created = await create.mutateAsync(values)
-          notify.success('Invitation sent')
+          const created = await create.mutateAsync(values as CreateAdminDto)
+          notify.success('Administrator created')
           navigate(route(PATHS.adminManager, created.id))
         }}
       />

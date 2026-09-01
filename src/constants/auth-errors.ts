@@ -32,6 +32,15 @@ export const AUTH_ERROR_CODES = {
   otpMaxAttempts: 'OTP_MAX_ATTEMPTS_REACHED',
   otpResendTooSoon: 'OTP_RESEND_TOO_SOON',
   rateLimited: 'RATE_LIMITED',
+
+  // ── Authorisation and domain rules ────────────────────────────────
+  permissionDenied: 'PERMISSION_DENIED',
+  notFound: 'NOT_FOUND',
+  conflict: 'CONFLICT',
+  roleAlreadyExists: 'ROLE_ALREADY_EXISTS',
+  systemRoleProtected: 'SYSTEM_ROLE_PROTECTED',
+  roleHierarchyCycle: 'ROLE_HIERARCHY_CYCLE',
+  businessRuleViolation: 'BUSINESS_RULE_VIOLATION',
 } as const
 
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CODES]
@@ -155,6 +164,48 @@ export const AUTH_ERROR_META: Record<string, AuthErrorMeta> = {
 
   [AUTH_ERROR_CODES.rateLimited]: {
     message: 'Too many requests. Please wait a moment and try again.',
+    action: 'none',
+    preferServerMessage: true,
+  },
+
+  // ── Authorisation and domain rules ────────────────────────────────
+  //
+  // The critical property of `PERMISSION_DENIED`: it is *not* session-ending.
+  // Being refused one action says nothing about whether you are signed in, so
+  // it must never clear tokens or bounce the user to the login screen.
+  [AUTH_ERROR_CODES.permissionDenied]: {
+    message: 'You do not have permission to do this.',
+    action: 'none',
+    preferServerMessage: true,
+  },
+  [AUTH_ERROR_CODES.notFound]: {
+    message: 'That record no longer exists.',
+    action: 'none',
+  },
+  [AUTH_ERROR_CODES.conflict]: {
+    message: 'That conflicts with an existing record.',
+    action: 'none',
+    // The server names the clashing field — "Email already in use" beats ours.
+    preferServerMessage: true,
+  },
+  [AUTH_ERROR_CODES.roleAlreadyExists]: {
+    message: 'A role with that key already exists.',
+    action: 'field',
+    field: 'key',
+  },
+  [AUTH_ERROR_CODES.systemRoleProtected]: {
+    message: 'Built-in roles cannot be deleted. Deactivate it instead.',
+    action: 'none',
+  },
+  [AUTH_ERROR_CODES.roleHierarchyCycle]: {
+    message: 'That parent would create a loop in the role hierarchy.',
+    action: 'field',
+    field: 'parentId',
+  },
+  // Always verbatim: the server has already written a specific, human
+  // explanation of the rule that was broken. Ours could only be vaguer.
+  [AUTH_ERROR_CODES.businessRuleViolation]: {
+    message: 'That action is not allowed.',
     action: 'none',
     preferServerMessage: true,
   },

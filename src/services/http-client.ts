@@ -11,6 +11,7 @@ import type {
   ApiErrorEnvelope,
   FieldErrors,
   HttpMethod,
+  PaginatedResponse,
   RequestOptions,
 } from '@/types/api.types'
 import { buildQueryString } from '@/utils/query-string'
@@ -146,6 +147,13 @@ function unwrap<TResponse>(payload: unknown): TResponse {
 interface SendOptions extends RequestOptions {
   /** Guards the retry so one request can never trigger a refresh loop. */
   isRetry?: boolean
+  /**
+   * Resolve with the whole envelope rather than just `data`.
+   *
+   * List endpoints put `pagination` beside `data`, so unwrapping to `data`
+   * alone would silently drop the page count.
+   */
+  rawEnvelope?: boolean
 }
 
 async function send<TResponse>(
@@ -161,6 +169,7 @@ async function send<TResponse>(
     headers,
     signal,
     isRetry,
+    rawEnvelope,
     ...init
   } = options
 
@@ -208,7 +217,7 @@ async function send<TResponse>(
   }
 
   const payload = await parseBody(response)
-  if (response.ok) return unwrap<TResponse>(payload)
+  if (response.ok) return rawEnvelope ? (payload as TResponse) : unwrap<TResponse>(payload)
 
   const error = toApiError(response.status, payload)
 
@@ -270,6 +279,39 @@ export const httpClient = {
 
   delete: <TResponse>(path: string, options: RequestOptions = {}) =>
     send<TResponse>('DELETE', path, undefined, options),
+
+  /**
+   * GET a list endpoint, recombining the envelope's `data` and its sibling
+   * `pagination` into one object.
+   *
+   * `pagination` is absent on a non-paginated collection, so a safe default is
+   * synthesised from the returned rows — a caller should never have to check
+   * whether the server bothered to send it.
+   */
+  async list<TItem>(
+    path: string,
+    options: RequestOptions = {},
+  ): Promise<PaginatedResponse<TItem>> {
+    const envelope = await send<{
+      data?: TItem[]
+      pagination?: PaginatedResponse<TItem>['pagination']
+    }>('GET', path, undefined, { ...options, rawEnvelope: true })
+
+    const items = Array.isArray(envelope?.data) ? envelope.data : []
+    const total = envelope?.pagination?.total ?? items.length
+
+    return {
+      items,
+      pagination: envelope?.pagination ?? {
+        page: 1,
+        limit: items.length,
+        total,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    }
+  },
 }
 
 export type HttpClient = typeof httpClient

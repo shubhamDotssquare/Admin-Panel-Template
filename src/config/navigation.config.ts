@@ -1,12 +1,17 @@
 import {
+  Activity,
   BarChart3,
+  Bell,
   FileText,
+  Flag,
   LayoutDashboard,
   LifeBuoy,
   Mail,
   MessageSquare,
+  ScrollText,
   Settings,
   ShieldCheck,
+  StickyNote,
   Users,
 } from 'lucide-react'
 
@@ -38,8 +43,20 @@ export const NAVIGATION: NavGroup[] = [
       {
         id: 'analytics',
         label: 'Analytics',
-        path: PATHS.analytics,
         icon: BarChart3,
+        children: [
+          { id: 'analytics-revenue', label: 'Revenue', path: PATHS.analytics },
+          {
+            id: 'analytics-location',
+            label: 'Location',
+            path: route(PATHS.analytics, 'location'),
+          },
+          {
+            id: 'analytics-device',
+            label: 'Device',
+            path: route(PATHS.analytics, 'device'),
+          },
+        ],
       },
     ],
   },
@@ -51,8 +68,14 @@ export const NAVIGATION: NavGroup[] = [
         id: 'user-manager',
         label: 'User Manager',
         icon: Users,
+        permissions: ['users.read'],
         children: [
-          { id: 'user-list', label: 'All Users', path: PATHS.userManager },
+          {
+            id: 'user-list',
+            label: 'All Users',
+            path: PATHS.userManager,
+            permissions: ['users.read'],
+          },
           { id: 'user-groups', label: 'Groups', path: route(PATHS.userManager, 'groups') },
         ],
       },
@@ -60,13 +83,25 @@ export const NAVIGATION: NavGroup[] = [
         id: 'admin-manager',
         label: 'Admin Manager',
         icon: ShieldCheck,
+        permissions: ['admins.read'],
         children: [
-          { id: 'admin-list', label: 'Administrators', path: PATHS.adminManager },
-          { id: 'admin-roles', label: 'Roles', path: route(PATHS.adminManager, 'roles') },
+          {
+            id: 'admin-list',
+            label: 'Administrators',
+            path: PATHS.adminManager,
+            permissions: ['admins.read'],
+          },
+          {
+            id: 'admin-roles',
+            label: 'Roles',
+            path: route(PATHS.adminManager, 'roles'),
+            permissions: ['roles.read'],
+          },
           {
             id: 'admin-permissions',
             label: 'Permissions',
             path: route(PATHS.adminManager, 'permissions'),
+            permissions: ['permissions.read'],
           },
         ],
       },
@@ -82,6 +117,7 @@ export const NAVIGATION: NavGroup[] = [
         icon: FileText,
         children: [
           { id: 'cms-pages', label: 'Pages', path: PATHS.cms },
+          { id: 'cms-blog', label: 'Blog', path: route(PATHS.cms, 'blog') },
           { id: 'cms-media', label: 'Media Library', path: route(PATHS.cms, 'media') },
         ],
       },
@@ -131,8 +167,41 @@ export const NAVIGATION: NavGroup[] = [
       {
         id: 'help-support',
         label: 'Help & Support',
-        path: PATHS.helpSupport,
         icon: LifeBuoy,
+        children: [
+          { id: 'help-tickets', label: 'Support Tickets', path: PATHS.helpSupport },
+          { id: 'help-faqs', label: 'FAQs', path: route(PATHS.helpSupport, 'faqs') },
+        ],
+      },
+      {
+        id: 'notifications',
+        label: 'Notifications',
+        path: PATHS.notifications,
+        icon: Bell,
+      },
+      {
+        id: 'activity-feed',
+        label: 'Activity Feed',
+        path: PATHS.activityFeed,
+        icon: Activity,
+      },
+      {
+        id: 'notes',
+        label: 'Notes',
+        path: PATHS.notes,
+        icon: StickyNote,
+      },
+      {
+        id: 'feature-flags',
+        label: 'Feature Flags',
+        path: PATHS.featureFlags,
+        icon: Flag,
+      },
+      {
+        id: 'audit-logs',
+        label: 'Audit Logs',
+        path: PATHS.auditLogs,
+        icon: ScrollText,
       },
     ],
   },

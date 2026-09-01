@@ -6,11 +6,13 @@ import { CrudTable } from '@/components/data-table'
 import { ListPage, StatusBadge } from '@/components/patterns'
 import { Button } from '@/components/ui/button'
 import { useTableState } from '@/hooks/use-table-state'
+import { usePermission } from '@/hooks/use-permission'
+import { PERMISSIONS } from '@/types/rbac.types'
 import { PATHS, route } from '@/router/paths'
 import type { TableSchema } from '@/types/table.types'
 import { formatDate, formatRelativeTime } from '@/utils/format'
 import { notify } from '@/utils/toast'
-import { users, useSetUserStatus } from '../services/user.queries'
+import { users, useUserLifecycle } from '../services/user.queries'
 import { USER_STATUS, USER_STATUS_OPTIONS, userFullName, type User } from '../types'
 
 /** Where this module's screens live, derived from the reserved base path. */
@@ -24,7 +26,11 @@ const paths = {
 export function UserListPage() {
   const navigate = useNavigate()
   const remove = users.useRemove()
-  const setStatus = useSetUserStatus()
+
+  const canCreate = usePermission(PERMISSIONS.usersCreate)
+  const canUpdate = usePermission(PERMISSIONS.usersUpdate)
+  const canDelete = usePermission(PERMISSIONS.usersDelete)
+  const lifecycle = useUserLifecycle()
 
   const [total, setTotal] = useState<number | undefined>(undefined)
 
@@ -41,7 +47,7 @@ export function UserListPage() {
       },
       export: {
         filename: 'users',
-        fetchAll: async () => (await users.service.list({ perPage: 500 })).items,
+        fetchAll: async () => (await users.service.list({ limit: 500 })).items,
       },
 
       filters: [
@@ -69,15 +75,10 @@ export function UserListPage() {
           cell: (user) => <StatusBadge status={user.status} map={USER_STATUS} />,
         },
         {
-          id: 'groups',
-          header: 'Groups',
-          accessor: (user) => user.groups?.join(', ') ?? '',
-          cell: (user) =>
-            user.groups?.length ? (
-              user.groups.join(', ')
-            ) : (
-              <span className="text-muted-foreground">—</span>
-            ),
+          id: 'phone',
+          header: 'Phone',
+          accessor: (user) => user.phone ?? '',
+          cell: (user) => user.phone ?? <span className="text-muted-foreground">—</span>,
         },
         {
           id: 'lastLoginAt',
@@ -112,6 +113,7 @@ export function UserListPage() {
           id: 'edit',
           label: 'Edit',
           icon: Pencil,
+          hidden: () => !canUpdate,
           onSelect: (user) => navigate(paths.edit(user.id)),
         },
         {
@@ -120,7 +122,7 @@ export function UserListPage() {
           icon: Ban,
           // Hidden rather than disabled: "suspend" on a suspended account is
           // not a temporarily unavailable action, it is a meaningless one.
-          hidden: (user) => user.status === 'SUSPENDED',
+          hidden: (user) => !canUpdate || user.status === 'SUSPENDED',
           confirm: (user) => ({
             title: `Suspend ${userFullName(user)}?`,
             description: 'They will be signed out and blocked from signing in again.',
@@ -128,7 +130,7 @@ export function UserListPage() {
             destructive: true,
           }),
           onSelect: async (user) => {
-            await setStatus.mutateAsync({ id: user.id, status: 'SUSPENDED' })
+            await lifecycle.mutateAsync({ id: user.id, action: 'suspend' })
             notify.success(`${userFullName(user)} suspended`)
           },
         },
@@ -136,9 +138,9 @@ export function UserListPage() {
           id: 'activate',
           label: 'Activate',
           icon: CheckCircle2,
-          hidden: (user) => user.status === 'ACTIVE',
+          hidden: (user) => !canUpdate || user.status === 'ACTIVE',
           onSelect: async (user) => {
-            await setStatus.mutateAsync({ id: user.id, status: 'ACTIVE' })
+            await lifecycle.mutateAsync({ id: user.id, action: 'activate' })
             notify.success(`${userFullName(user)} activated`)
           },
         },
@@ -147,6 +149,7 @@ export function UserListPage() {
           label: 'Delete',
           icon: Trash2,
           destructive: true,
+          hidden: () => !canDelete,
           confirm: (user) => ({
             title: `Delete ${userFullName(user)}?`,
             description: 'This cannot be undone.',
@@ -166,7 +169,7 @@ export function UserListPage() {
           icon: CheckCircle2,
           onSelect: async (rows) => {
             await Promise.all(
-              rows.map((user) => setStatus.mutateAsync({ id: user.id, status: 'ACTIVE' })),
+              rows.map((user) => lifecycle.mutateAsync({ id: user.id, action: 'activate' })),
             )
             notify.success(`Activated ${rows.length}`)
           },
@@ -183,22 +186,22 @@ export function UserListPage() {
           }),
           onSelect: async (rows) => {
             await Promise.all(
-              rows.map((user) => setStatus.mutateAsync({ id: user.id, status: 'SUSPENDED' })),
+              rows.map((user) => lifecycle.mutateAsync({ id: user.id, action: 'suspend' })),
             )
             notify.success(`Suspended ${rows.length}`)
           },
         },
       ],
     }),
-    [navigate, remove, setStatus],
+    [canDelete, canUpdate, lifecycle, navigate, remove],
   )
 
   const table = useTableState({ schema, syncToUrl: true, total })
   const list = users.useList(table.params)
 
   useEffect(() => {
-    setTotal(list.data?.meta.total)
-  }, [list.data?.meta.total])
+    setTotal(list.data?.pagination.total)
+  }, [list.data?.pagination.total])
 
   const rows = list.data?.items ?? []
   const countBy = (status: User['status']): number =>
@@ -209,12 +212,14 @@ export function UserListPage() {
       title="Users"
       description="Accounts that can sign in to the customer-facing product."
       actions={
-        <Button asChild size="sm">
-          <Link to={paths.create}>
-            <UserPlus className="size-4" />
-            Add user
-          </Link>
-        </Button>
+        canCreate && (
+          <Button asChild size="sm">
+            <Link to={paths.create}>
+              <UserPlus className="size-4" />
+              Add user
+            </Link>
+          </Button>
+        )
       }
       stats={[
         { label: 'Total users', value: total ?? '—', icon: Users, isLoading: list.isLoading },
@@ -229,6 +234,7 @@ export function UserListPage() {
         rows={rows}
         total={total}
         isLoading={list.isLoading}
+        error={list.error}
       />
     </ListPage>
   )

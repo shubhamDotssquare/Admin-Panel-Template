@@ -31,6 +31,11 @@ export const PATHS = {
   emailTemplates: '/email-templates',
   helpSupport: '/help',
   analytics: '/analytics',
+  notifications: '/notifications',
+  notes: '/notes',
+  featureFlags: '/feature-flags',
+  auditLogs: '/audit-logs',
+  activityFeed: '/activity-feed',
 
   // Terminal states.
   forbidden: '/403',

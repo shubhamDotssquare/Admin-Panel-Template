@@ -2,8 +2,18 @@ import type { RouteObject } from 'react-router'
 
 import type { ModuleDefinition } from '@/types/module.types'
 import type { NavGroup } from '@/types/navigation.types'
+import { activityFeedModule } from './activity-feed'
 import { adminManagerModule } from './admin-manager'
+import { analyticsModule } from './analytics'
+import { auditLogsModule } from './audit-logs'
+import { cmsModule } from './cms'
 import { dashboardModule } from './dashboard'
+import { emailTemplatesModule } from './email-templates'
+import { enquiryManagerModule } from './enquiry-manager'
+import { featureFlagsModule } from './feature-flags'
+import { helpSupportModule } from './help-support'
+import { notesModule } from './notes'
+import { notificationsModule } from './notifications'
 import { userManagerModule } from './user-manager'
 
 /**
@@ -12,16 +22,21 @@ import { userManagerModule } from './user-manager'
  * Register a module here and the router mounts its routes and the sidebar picks
  * up any navigation it contributes. Nothing else in the framework imports a
  * module directly — that boundary is what keeps the shell reusable.
- *
- * Planned: cms, settings, enquiry-manager,
- * email-templates, help-support, analytics. Their paths are already reserved in
- * `@/router/paths` and listed in `@/config/navigation.config`, so each can be
- * dropped in independently.
  */
 export const MODULE_REGISTRY: ModuleDefinition[] = [
   dashboardModule,
   userManagerModule,
   adminManagerModule,
+  enquiryManagerModule,
+  emailTemplatesModule,
+  cmsModule,
+  helpSupportModule,
+  analyticsModule,
+  notificationsModule,
+  notesModule,
+  featureFlagsModule,
+  auditLogsModule,
+  activityFeedModule,
 ]
 
 /** Registered modules that are switched on. */

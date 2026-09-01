@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Lock,
+  MoreHorizontal,
+  X,
+} from 'lucide-react'
 
 import { DataTable, type DataTableColumn } from '@/components/common/data-table'
 import { Button } from '@/components/ui/button'
@@ -10,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { EmptyState } from '@/components/common/empty-state'
 import { Spinner } from '@/components/ui/spinner'
 import { useConfirm } from '@/hooks/use-confirm'
 import type { UseTableStateResult } from '@/hooks/use-table-state'
@@ -20,6 +29,8 @@ import type {
   RowAction,
   TableSchema,
 } from '@/types/table.types'
+import { AUTH_ERROR_CODES } from '@/constants/auth-errors'
+import { resolveAuthError } from '@/services/auth-error'
 import { cn } from '@/utils/cn'
 import { exportRows, type ExportColumn, type ExportFormat } from '@/utils/export'
 import { notify } from '@/utils/toast'
@@ -36,7 +47,7 @@ function headerText<TRow>(column: ColumnSchema<TRow>): string {
 }
 
 function resolveConfirm<T>(
-  confirm: ActionConfirm | ((value: T) => ActionConfirm) | undefined,
+  confirm: ActionConfirm | ((value: T) => ActionConfirm | undefined) | undefined,
   value: T,
 ): ActionConfirm | undefined {
   return typeof confirm === 'function' ? confirm(value) : confirm
@@ -48,6 +59,13 @@ export interface CrudTableProps<TRow> {
   rows: TRow[]
   total?: number
   isLoading?: boolean
+  /**
+   * A failed list query. Rendered in place of the table.
+   *
+   * Worth passing: a permission failure otherwise shows an empty table, which
+   * reads as "there is nothing here" rather than "you may not see this".
+   */
+  error?: unknown
   /** Buttons for the toolbar's right side, e.g. "Add user". */
   actions?: React.ReactNode
   className?: string
@@ -75,6 +93,7 @@ export function CrudTable<TRow>({
   rows,
   total,
   isLoading = false,
+  error,
   actions,
   className,
 }: CrudTableProps<TRow>) {
@@ -325,30 +344,53 @@ export function CrudTable<TRow>({
         </div>
       ) : null}
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={schema.rowKey}
-        isLoading={isLoading}
-        onRowClick={schema.onRowClick}
-        emptyIcon={schema.empty?.icon}
-        emptyTitle={
-          schema.empty?.title ??
-          (table.activeFilterCount > 0 ? 'No matching records' : 'Nothing here yet')
+      {error ? (
+        <ErrorState error={error} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={schema.rowKey}
+          isLoading={isLoading}
+          onRowClick={schema.onRowClick}
+          emptyIcon={schema.empty?.icon}
+          emptyTitle={
+            schema.empty?.title ??
+            (table.activeFilterCount > 0 ? 'No matching records' : 'Nothing here yet')
+          }
+          emptyDescription={
+            table.activeFilterCount > 0
+              ? 'Try a different search or clear the filters.'
+              : schema.empty?.description
+          }
+          footer={
+            <TablePagination
+              pagination={table.pagination}
+              total={total}
+              perPageOptions={schema.perPageOptions}
+              rowCount={rows.length}
+            />
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+/** A failed list query, with permission denials called out as such. */
+function ErrorState({ error }: { error: unknown }) {
+  const resolved = resolveAuthError(error)
+  const isDenied = resolved.code === AUTH_ERROR_CODES.permissionDenied
+
+  return (
+    <div className="rounded-lg border border-border">
+      <EmptyState
+        icon={isDenied ? Lock : AlertTriangle}
+        title={
+          isDenied ? 'You do not have permission to view this' : 'Could not load this list'
         }
-        emptyDescription={
-          table.activeFilterCount > 0
-            ? 'Try a different search or clear the filters.'
-            : schema.empty?.description
-        }
-        footer={
-          <TablePagination
-            pagination={table.pagination}
-            total={total}
-            perPageOptions={schema.perPageOptions}
-            rowCount={rows.length}
-          />
-        }
+        description={resolved.message}
+        className="border-none"
       />
     </div>
   )

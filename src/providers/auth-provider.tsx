@@ -2,8 +2,10 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState } from
 
 import { appConfig } from '@/config/app.config'
 import { authService } from '@/services/auth.service'
+import { rbacService } from '@/services/rbac.service'
 import { configureHttpClient } from '@/services/http-client'
 import { sessionService } from '@/services/session.service'
+import type { AssignedRole, PermissionKey } from '@/types/rbac.types'
 import type {
   AuthStatus,
   AuthUser,
@@ -31,11 +33,22 @@ export interface AuthContextValue {
   refresh: () => Promise<boolean>
   /** Re-read the current user — after a profile edit, say. */
   fetchMe: () => Promise<AuthUser | null>
+  /** Flattened permission keys from every role this admin holds. */
+  permissions: PermissionKey[]
+  /** The roles themselves, for display on a profile screen. */
+  roles: AssignedRole[]
+  /** True once permissions have been fetched, so gates can avoid flicker. */
+  permissionsLoaded: boolean
+  /** Re-read permissions — after this admin's own roles change. */
+  refreshPermissions: () => Promise<void>
   /**
-   * Permission check. **There is no server-side RBAC yet**, so this is a UI
-   * convenience only and must never be the sole gate on a sensitive action.
+   * Does the signed-in admin hold this permission?
+   *
+   * Presentation only. The server enforces every one of these independently and
+   * answers `PERMISSION_DENIED`; this exists so the UI can hide controls that
+   * would only fail, not to secure anything.
    */
-  can: (permission: string) => boolean
+  can: (permission: PermissionKey) => boolean
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
@@ -62,12 +75,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
   const [user, setUser] = useState<AuthUser | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [permissions, setPermissions] = useState<PermissionKey[]>([])
+  const [roles, setRoles] = useState<AssignedRole[]>([])
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false)
 
   const clearSession = useCallback(() => {
     sessionService.clear()
     setUser(null)
     setSessionId(null)
+    setPermissions([])
+    setRoles([])
+    setPermissionsLoaded(false)
     setStatus('unauthenticated')
+  }, [])
+
+  /**
+   * Load the signed-in admin's permissions.
+   *
+   * Failure is deliberately non-fatal: a permissions outage should degrade the
+   * UI to "nothing extra is offered", not lock someone out of a panel they are
+   * legitimately signed in to. The server still refuses anything they may not do.
+   */
+  const refreshPermissions = useCallback(async () => {
+    try {
+      const result = await rbacService.myPermissions()
+      setPermissions(result?.effectivePermissions ?? [])
+      setRoles(result?.roles ?? [])
+    } catch {
+      setPermissions([])
+      setRoles([])
+    } finally {
+      setPermissionsLoaded(true)
+    }
   }, [])
 
   /**
@@ -109,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(refreshedUser)
         setSessionId(refreshedSessionId ?? null)
         setStatus('authenticated')
+        void refreshPermissionsRef.current()
       }
 
       return true
@@ -138,6 +178,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Read after an await, where the captured `status` would be stale.
   const statusRef = useRef(status)
   statusRef.current = status
+  const refreshPermissionsRef = useRef(refreshPermissions)
+  refreshPermissionsRef.current = refreshPermissions
 
   useEffect(() => {
     configureHttpClient({
@@ -152,8 +194,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(current)
     setSessionId(currentSessionId ?? null)
     setStatus('authenticated')
+
+    // Permissions are loaded alongside the user on every hydrate, so no screen
+    // ever has to wonder whether they are present.
+    await refreshPermissions()
     return current
-  }, [])
+  }, [refreshPermissions])
 
   // Restore a session once per mount: refresh, then hydrate.
   useEffect(() => {
@@ -180,16 +226,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [authEnabled, clearSession, fetchMe])
 
-  const signIn = useCallback(async (credentials: LoginCredentials) => {
-    const result = await authService.login(credentials)
+  const signIn = useCallback(
+    async (credentials: LoginCredentials) => {
+      const result = await authService.login(credentials)
 
-    sessionService.setTokens(result.tokens)
-    setUser(result.user)
-    setSessionId(result.sessionId ?? null)
-    setStatus('authenticated')
+      sessionService.setTokens(result.tokens)
+      setUser(result.user)
+      setSessionId(result.sessionId ?? null)
+      setStatus('authenticated')
 
-    return result
-  }, [])
+      // Awaited, not fired and forgotten: the screen the user lands on decides
+      // what to render from these, and an empty set would flash a stripped nav.
+      await refreshPermissions()
+
+      return result
+    },
+    [refreshPermissions],
+  )
 
   /** Registration does not sign anyone in — the account is PENDING until verified. */
   const register = useCallback((payload: RegisterPayload) => authService.register(payload), [])
@@ -222,13 +275,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return revoked
   }, [clearSession])
 
-  const can = useCallback((_permission: string) => {
-    // No RBAC server-side yet, so gating the UI on a role would imply an
-    // enforcement that does not exist. Everything is permitted; revisit when
-    // the backend grows real permissions.
-    void _permission
-    return true
-  }, [])
+  const can = useCallback(
+    (permission: PermissionKey) => {
+      // With auth switched off the panel runs with no backend at all, so gating
+      // would leave every screen empty. That mode is for local development only.
+      if (!authEnabled) return true
+      return permissions.includes(permission)
+    },
+    [authEnabled, permissions],
+  )
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -244,6 +299,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOutEverywhere,
       refresh,
       fetchMe,
+      permissions,
+      roles,
+      permissionsLoaded,
+      refreshPermissions,
       can,
     }),
     [
@@ -256,6 +315,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOutEverywhere,
       refresh,
       fetchMe,
+      permissions,
+      roles,
+      permissionsLoaded,
+      refreshPermissions,
       can,
     ],
   )

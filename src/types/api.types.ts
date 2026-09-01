@@ -12,6 +12,8 @@ export interface ApiResponse<TData = unknown> {
   success: true
   message?: string
   data: TData
+  /** Present on list endpoints only. */
+  pagination?: PaginationMeta
   /** Correlates a response with the server's logs — surfaced on failures. */
   requestId?: string
   timestamp?: string
@@ -41,26 +43,42 @@ export interface ApiErrorEnvelope {
   timestamp?: string
 }
 
+/**
+ * Paging metadata.
+ *
+ * Sent as a **sibling of `data`** in the envelope, not inside it, so the client
+ * lifts it out separately — see `httpClient.list`.
+ */
 export interface PaginationMeta {
   page: number
-  perPage: number
+  limit: number
   total: number
   totalPages: number
+  hasNextPage: boolean
+  hasPreviousPage: boolean
 }
 
+/** A list response, recombined from the envelope's `data` + `pagination`. */
 export interface PaginatedResponse<TItem> {
   items: TItem[]
-  meta: PaginationMeta
+  pagination: PaginationMeta
 }
 
-/** Query params accepted by any list endpoint. */
+/**
+ * Query params every list endpoint accepts.
+ *
+ * The index signature carries filters as **top-level** params — this API takes
+ * `?status=ACTIVE,PENDING`, not a nested `filters[status]`.
+ */
 export interface ListQueryParams {
   page?: number
-  perPage?: number
+  limit?: number
   search?: string
   sortBy?: string
-  sortDirection?: 'asc' | 'desc'
-  filters?: Record<string, string | number | boolean | undefined>
+  sortOrder?: 'asc' | 'desc'
+  dateFrom?: string
+  dateTo?: string
+  [param: string]: unknown
 }
 
 /** Field-level validation failures, keyed by field name. */

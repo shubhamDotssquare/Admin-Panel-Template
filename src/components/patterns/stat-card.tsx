@@ -1,4 +1,5 @@
 import { TrendingDown, TrendingUp } from 'lucide-react'
+import { Link } from 'react-router'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -19,6 +20,8 @@ export interface StatCardProps {
   trend?: { value: string; direction: 'up' | 'down'; goodWhenDown?: boolean }
   isLoading?: boolean
   className?: string
+  /** Route to navigate to when the card is clicked. Omit for a static card. */
+  to?: string
 }
 
 /** One number on a list screen's summary row. */
@@ -30,12 +33,19 @@ export function StatCard({
   trend,
   isLoading = false,
   className,
+  to,
 }: StatCardProps) {
   const isGood = trend ? (trend.direction === 'up') !== Boolean(trend.goodWhenDown) : false
   const TrendIcon = trend?.direction === 'up' ? TrendingUp : TrendingDown
+  const isLinked = Boolean(to) && !isLoading
 
-  return (
-    <Card className={className}>
+  const card = (
+    <Card
+      className={cn(
+        isLinked && 'transition-colors hover:border-muted-foreground/30 hover:bg-muted/50',
+        className,
+      )}
+    >
       <CardContent className="flex items-start justify-between gap-3 py-1">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="text-caption text-muted-foreground">{label}</span>
@@ -71,5 +81,17 @@ export function StatCard({
         )}
       </CardContent>
     </Card>
+  )
+
+  if (!isLinked) return card
+
+  return (
+    <Link
+      to={to as string}
+      aria-label={label}
+      className="block rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+    >
+      {card}
+    </Link>
   )
 }

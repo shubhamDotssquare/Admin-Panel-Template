@@ -5,86 +5,73 @@ import {
   Form,
   FormActions,
   FormSection,
-  MultiSelectField,
+  JsonField,
   SelectField,
   TextField,
-  TextareaField,
   useAppForm,
 } from '@/components/form'
-import { emailSchema, requiredString } from '@/lib/zod-schemas'
-import type { CreateUserDto, User } from '../types'
-import { USER_GROUP_OPTIONS, USER_STATUS_OPTIONS } from '../types'
+import { emailSchema, jsonStringSchema } from '@/lib/zod-schemas'
+import { resolveAuthError } from '@/services/auth-error'
+import { USER_STATUS_OPTIONS, type CreateUserDto, type User } from '../types'
 
 const userSchema = z.object({
-  firstName: requiredString('Enter a first name.').max(80, 'Must be 80 characters or fewer.'),
-  lastName: requiredString('Enter a last name.').max(80, 'Must be 80 characters or fewer.'),
   email: emailSchema,
+  firstName: z.string().trim().max(80, 'Must be 80 characters or fewer.'),
+  lastName: z.string().trim().max(80, 'Must be 80 characters or fewer.'),
   phone: z.string().trim().max(32, 'Must be 32 characters or fewer.'),
-  status: requiredString('Choose a status.'),
-  groups: z.array(z.string()),
-  notes: z.string().trim().max(500, 'Keep notes under 500 characters.'),
+  status: z.string().min(1, 'Choose a status.'),
+  // Held as text while editing; parsed once, on submit.
+  metadata: jsonStringSchema(),
 })
 
 export type UserFormValues = z.infer<typeof userSchema>
 
 interface UserFormProps {
-  /** Omit to create. Supplying a record switches the form to edit. */
+  /** Omit to create. */
   user?: User
   onSubmit: (values: CreateUserDto) => Promise<unknown>
   onCancel: () => void
-  submitLabel?: string
 }
 
-/**
- * One form for both create and edit.
- *
- * The two screens differ only in defaults and copy, so sharing the form is what
- * stops the "add" and "edit" versions of a record drifting apart — a class of
- * bug that is invisible until someone edits a field that create never set.
- */
-export function UserForm({ user, onSubmit, onCancel, submitLabel }: UserFormProps) {
+export function UserForm({ user, onSubmit, onCancel }: UserFormProps) {
   const form = useAppForm<UserFormValues>({
     schema: userSchema,
     defaultValues: {
+      email: user?.email ?? '',
+      // The API returns `null` for unset optionals; inputs need strings.
       firstName: user?.firstName ?? '',
       lastName: user?.lastName ?? '',
-      email: user?.email ?? '',
-      // The API returns `null` for unset optionals; the form needs strings.
       phone: user?.phone ?? '',
       status: user?.status ?? 'PENDING',
-      groups: user?.groups ?? [],
-      notes: user?.notes ?? '',
+      // Seeded with the *current* object, which is what makes the editor safe:
+      // the API replaces metadata wholesale, so submitting anything less than
+      // the whole object would silently drop keys.
+      metadata: user?.metadata ? JSON.stringify(user.metadata, null, 2) : '',
     },
   })
 
   return (
     <Form
       form={form}
+      mapError={resolveAuthError}
       onSubmit={(values) =>
         onSubmit({
-          ...values,
-          status: values.status as CreateUserDto['status'],
-          // Send omissions rather than empty strings, so the API stores null.
+          email: values.email,
+          firstName: values.firstName || undefined,
+          lastName: values.lastName || undefined,
           phone: values.phone || undefined,
-          notes: values.notes || undefined,
+          status: values.status as CreateUserDto['status'],
+          // Validated as JSON by the schema, so this cannot throw here.
+          metadata: values.metadata.trim()
+            ? (JSON.parse(values.metadata) as Record<string, unknown>)
+            : undefined,
         })
       }
     >
-      <FormSection title="Identity" description="How this person appears across the panel.">
+      <FormSection title="Contact">
         <FieldGroup>
-          <TextField<UserFormValues>
-            name="firstName"
-            label="First name"
-            required
-            autoFocus
-            placeholder="Ada"
-          />
-          <TextField<UserFormValues>
-            name="lastName"
-            label="Last name"
-            required
-            placeholder="Lovelace"
-          />
+          <TextField<UserFormValues> name="firstName" label="First name" placeholder="Ada" />
+          <TextField<UserFormValues> name="lastName" label="Last name" placeholder="Lovelace" />
         </FieldGroup>
 
         <FieldGroup>
@@ -102,37 +89,27 @@ export function UserForm({ user, onSubmit, onCancel, submitLabel }: UserFormProp
             placeholder="+44 …"
           />
         </FieldGroup>
+
+        <SelectField<UserFormValues>
+          name="status"
+          label="Status"
+          required
+          options={USER_STATUS_OPTIONS}
+        />
       </FormSection>
 
-      <FormSection title="Access" description="Status and group membership.">
-        <FieldGroup>
-          <SelectField<UserFormValues>
-            name="status"
-            label="Status"
-            required
-            options={USER_STATUS_OPTIONS}
-          />
-          <MultiSelectField<UserFormValues>
-            name="groups"
-            label="Groups"
-            options={USER_GROUP_OPTIONS}
-            placeholder="No groups"
-          />
-        </FieldGroup>
-
-        <TextareaField<UserFormValues>
-          name="notes"
-          label="Internal notes"
-          rows={3}
-          hint="Visible to your team only."
+      <FormSection title="Metadata" description="Free-form JSON stored against this record.">
+        <JsonField<UserFormValues>
+          name="metadata"
+          label="Metadata"
+          rows={8}
+          hint="Saving replaces the whole object — edit the JSON below rather than sending only what changed."
         />
       </FormSection>
 
       <FormActions
-        submitLabel={submitLabel ?? (user ? 'Save changes' : 'Create user')}
+        submitLabel={user ? 'Save changes' : 'Create user'}
         onCancel={onCancel}
-        // Editing without changing anything is a no-op worth preventing;
-        // creating starts empty, so the guard would block the first submit.
         requireDirty={Boolean(user)}
       />
     </Form>

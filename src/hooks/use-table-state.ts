@@ -172,11 +172,15 @@ export function useTableState<TRow>({
   const params = useMemo<ListQueryParams>(
     () => ({
       page: pagination.page,
-      perPage: pagination.perPage,
+      // The API calls it `limit`; the pagination hook calls it `perPage`. This
+      // is the one place the two vocabularies meet.
+      limit: pagination.perPage,
       // Omit empty values so the query key stays stable and the URL stays clean.
       ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
-      ...(sort ? { sortBy: sort.field, sortDirection: sort.direction as SortDirection } : {}),
-      ...(Object.keys(filters).length > 0 ? { filters } : {}),
+      ...(sort ? { sortBy: sort.field, sortOrder: sort.direction as SortDirection } : {}),
+      // Filters go out as top-level params (`?status=ACTIVE`), which is what
+      // this API reads — not a nested `filters[status]`.
+      ...filters,
     }),
     [debouncedSearch, filters, pagination.page, pagination.perPage, sort],
   )

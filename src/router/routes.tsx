@@ -24,6 +24,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/register-page'))
 const VerifyEmailPage = lazy(() => import('@/pages/auth/verify-email-page'))
 
 // Account settings screens.
+const GeneralSettingsPage = lazy(() => import('@/pages/settings/general-page'))
 const ChangePasswordPage = lazy(() => import('@/pages/settings/change-password-page'))
 const SessionsPage = lazy(() => import('@/pages/settings/sessions-page'))
 
@@ -63,6 +64,7 @@ export const routes: RouteObject[] = [
 
           // Account screens reached from the header's user menu.
           { path: PATHS.profile, Component: ProfilePage },
+          { path: PATHS.settings, Component: GeneralSettingsPage },
           { path: route(PATHS.settings, 'security'), Component: ChangePasswordPage },
           { path: route(PATHS.settings, 'devices'), Component: SessionsPage },
 

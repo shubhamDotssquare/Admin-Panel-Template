@@ -6,6 +6,7 @@ export { useDisclosure, type Disclosure } from './use-disclosure'
 export { useDocumentTitle } from './use-document-title'
 export { useLayout } from './use-layout'
 export { useLocalStorage } from './use-local-storage'
+export { useNavigation } from './use-navigation'
 export { useIsMobile, useMediaQuery } from './use-media-query'
 export {
   usePagination,

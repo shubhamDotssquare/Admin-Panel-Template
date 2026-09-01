@@ -84,7 +84,8 @@ export interface RowAction<TRow> {
   /** Render it, but inert — with a reason the UI can show. */
   disabled?: (row: TRow) => boolean
   destructive?: boolean
-  confirm?: ActionConfirm | ((row: TRow) => ActionConfirm)
+  /** Return nothing to run `onSelect` straight away for that row — e.g. only the destructive direction of a toggle needs a dialog. */
+  confirm?: ActionConfirm | ((row: TRow) => ActionConfirm | undefined)
 }
 
 export interface BulkAction<TRow> {
